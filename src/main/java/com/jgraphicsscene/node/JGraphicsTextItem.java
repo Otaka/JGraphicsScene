@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JGraphicsTextItem extends JGraphicsItem {
-    private static Font default_font = new JLabel().getFont();
+    private static Font DEFAULT_FONT = new JLabel().getFont();
     private final Rectangle boundingBox = new Rectangle();
     private float left, top, width, height;
     private Color color = Color.BLACK;
@@ -24,25 +24,31 @@ public class JGraphicsTextItem extends JGraphicsItem {
         this.text = text;
     }
 
+    public static Font getDefaultFont() {
+        return DEFAULT_FONT;
+    }
+
     public Font getFont() {
         if (font == null) {
-            font = default_font;
+            font = DEFAULT_FONT;
         }
         return font;
     }
 
-    public void setFont(Font font) {
+    public JGraphicsTextItem setFont(Font font) {
         this.font = font;
         cachedSplittedStrings = null;
+        return this;
     }
 
     public String getText() {
         return text;
     }
 
-    public void setText(String text) {
+    public JGraphicsTextItem setText(String text) {
         this.text = text;
         cachedSplittedStrings = null;
+        return this;
     }
 
     public float getLeft() {
@@ -73,8 +79,9 @@ public class JGraphicsTextItem extends JGraphicsItem {
         return color;
     }
 
-    public void setColor(Color color) {
+    public JGraphicsTextItem setColor(Color color) {
         this.color = color;
+        return this;
     }
 
     @Override
@@ -94,16 +101,16 @@ public class JGraphicsTextItem extends JGraphicsItem {
 
     @Override
     protected void paintItem(Graphics2D g, AffineTransform oldAffineTransform, Selection selection) {
+        g.setFont(getFont());
+        g.setColor(getColor());
         if (cachedSplittedStrings == null) {
             preprocessText(g);
         }
-        g.setFont(getFont());
-        g.setColor(getColor());
+
         int lineY = (int) (top + cachedStringsDistance);
         for (String str : cachedSplittedStrings) {
             g.drawString(str, 0, lineY);
             lineY += cachedStringsDistance;
-
         }
     }
 

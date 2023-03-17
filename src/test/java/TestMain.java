@@ -6,10 +6,7 @@ import com.jgraphicsscene.node.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.GridLayout;
+import java.awt.*;
 import java.io.IOException;
 
 public class TestMain extends JFrame {
@@ -71,7 +68,11 @@ public class TestMain extends JFrame {
                 .setFlag(JGraphicsItem.ItemIsSelectable | JGraphicsItem.ItemIsMovable));
         scene.addItem(new JGraphicsImageItem(300, 40, ImageIO.read(TestMain.class.getResourceAsStream("/icons/girl.png")))
                 .setFlag(JGraphicsItem.ItemIsSelectable | JGraphicsItem.ItemIsMovable));
-        scene.addItem(new JGraphicsTextItem(450, 40, -0, 0,150,100,"Hello world. My name is Dima. Every day I go to rabota. There are a lot of trees and flowers around my rabota."))
+        scene.addItem(new JGraphicsTextItem(450, 40, 0, 0,150,100,"Hello world. My name is Dima. Every day I go to rabota. There are a lot of trees and flowers around my rabota."))
+                .setFlag(JGraphicsItem.ItemIsSelectable | JGraphicsItem.ItemIsMovable);
+        scene.addItem(new JGraphicsTextItem(450, 150, 0, 0,150,100,"Some big text")
+                        .setFont(JGraphicsTextItem.getDefaultFont().deriveFont(Font.ITALIC,35f))
+                        .setColor(Color.GREEN))
                 .setFlag(JGraphicsItem.ItemIsSelectable | JGraphicsItem.ItemIsMovable);
 
         view1 = new JGraphicsView().setWheelZoomEnabled(true).setMiddleMousePanEnabled(true).setWheelZoomToPointer(true).setDragMode(DragMode.RubberBandDrag);
