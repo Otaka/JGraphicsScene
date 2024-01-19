@@ -56,10 +56,10 @@ public class TestMain extends JFrame {
         viewsPanel.setPreferredSize(new Dimension(800, 800));
         add(viewsPanel, BorderLayout.CENTER);
 
-        JPanel manipPanel=new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JSlider moveSlider=new JSlider(0, 300, 0);
+        JPanel manipPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JSlider moveSlider = new JSlider(0, 300, 0);
         moveSlider.addChangeListener(e -> {
-            imageItem.setPosition(moveSlider.getValue()+200, 200, true);
+            imageItem.setPosition(moveSlider.getValue() + 200, 200, true);
             imageItem.dirtyTransform();
         });
         manipPanel.add(moveSlider);
@@ -114,7 +114,7 @@ public class TestMain extends JFrame {
 
         scene.addItem(new JGraphicsLineItem(50, 50, 100, 100)
                 .setArrowOnStart(true)
-                        .setArrowOnEnd(true)
+                .setArrowOnEnd(true)
                 .setArrowStartColor(Color.RED)
                 .setArrowEndColor(Color.GREEN)
                 .setZOrder(2)

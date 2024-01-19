@@ -4,9 +4,9 @@ public class MouseEvent {
     private final int type;
     private final int button;
     private final int modifier;
+    private final int clickCount;
     private float x;
     private float y;
-    private final int clickCount;
     private boolean stopPropagation = false;
 
     public MouseEvent(int type, float x, float y, int button, int modifier) {

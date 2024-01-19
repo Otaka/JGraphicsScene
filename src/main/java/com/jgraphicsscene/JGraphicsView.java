@@ -12,8 +12,17 @@ import com.martijncourteaux.multitouchgestures.event.ScrollGestureEvent;
 
 import javax.swing.JPanel;
 import javax.swing.Timer;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
@@ -550,7 +559,7 @@ public class JGraphicsView extends JPanel {
     }
 
     private void showManipulators(JGraphicsItem item) {
-        if(item == null) return;
+        if (item == null) return;
         if (!item.hasFlag(JGraphicsItem.ItemShowManipulationHandlers)) {
             return;
         }

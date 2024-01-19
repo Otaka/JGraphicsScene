@@ -54,7 +54,7 @@ public class ConnectionsManagerExportImport {
 
         ExportData exportData = new ExportData(nodes, connections, linksData);
         for (NodeConfig node : connectionManager.getNodes()) {
-            ExportData.Node nodeData = new ExportData.Node(id2Node.getReverse(node), node.getItem().getX(),  node.getItem().getY(), node.getItem().getRotation(), node.getItem().getScale());
+            ExportData.Node nodeData = new ExportData.Node(id2Node.getReverse(node), node.getItem().getX(), node.getItem().getY(), node.getItem().getRotation(), node.getItem().getScale());
             if (exportCustomizer != null) {
                 nodeData.extra = exportCustomizer.createExtraNodeData(node);
                 exportCustomizer.fillNodeData(node, nodeData.extra);

@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TestGraphEditor extends JFrame {
+public class TestConnections extends JFrame {
 
     JPanel viewsPanel;
     JGraphicsView view;
@@ -43,8 +43,8 @@ public class TestGraphEditor extends JFrame {
     ConnectionManager connectionManager;
 
     public static void main(String[] args) {
-        System.out.println("Start Graph editor");
-        SwingUtilities.invokeLater(() -> new TestGraphEditor().start());
+        System.out.println("Start Connections test");
+        SwingUtilities.invokeLater(() -> new TestConnections().start());
     }
 
     private void start() {
@@ -90,7 +90,7 @@ public class TestGraphEditor extends JFrame {
                     }
                     view.hideManipulators();
                     scene.fireRedraw();
-            }
+                }
             }
         });
         view.setPreferredSize(new Dimension(800, 800));
@@ -106,7 +106,7 @@ public class TestGraphEditor extends JFrame {
                     return nodeTargetConfig.hasUserTag("in");
                 } else {
                     return nodeTargetConfig.hasUserTag("out");
-            }
+                }
             }
 
             @Override
@@ -150,7 +150,7 @@ public class TestGraphEditor extends JFrame {
         connectionManager.initConnectionTarget(1, targetOut, node).setUserTags("out");
         connectionManager.enableCreatingConnectionByDraggingConnectionTarget(targetOut, MouseEvent.BUTTON1);
         return node;
-        }
+    }
 
     private void save() {
         try {
@@ -159,17 +159,17 @@ public class TestGraphEditor extends JFrame {
                 @Override
                 public void fillNodeData(NodeConfig node, Object extraNodeData) {
                     ((Map<String, String>) extraNodeData).put("name", "Object1");
-    }
+                }
 
-        @Override
+                @Override
                 public void fillConnectionData(ConnectionConfig connection, Object extraConnectionData) {
                     ((Map<String, String>) extraConnectionData).put("name", "Connection1");
-        }
+                }
 
                 @Override
                 public HashMap<String, String> createExtraNodeData(NodeConfig node) {
                     return new HashMap<>();
-    }
+                }
 
                 @Override
                 public HashMap<String, String> createExtraConnectionData(ConnectionConfig connection) {
@@ -180,8 +180,8 @@ public class TestGraphEditor extends JFrame {
             printStream.close();
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
-            }
         }
+    }
 
     private void load() {
         try {
@@ -189,21 +189,21 @@ public class TestGraphEditor extends JFrame {
             ExportData data = new Gson().fromJson(new FileReader("./testData.json"), ExportData.class);
             connectionManager.createSerializer()
                     .setImportCustomizer(new ConnectionsManagerExportImport.ImportCustomizer() {
-        @Override
+                        @Override
                         public JGraphicsItem createNode(Object extraNodeData) {
-                            return TestGraphEditor.this.createNode(60, 60);
-        }
+                            return TestConnections.this.createNode(60, 60);
+                        }
 
-        @Override
+                        @Override
                         public JGraphicsSplineItem createConnection(Object extraConnectionData) {
                             return (JGraphicsSplineItem) new JGraphicsSplineItem(new Point2D.Float(0, 0), new Point2D.Float(100, 100))
                                     .setArrowOnEnd(true).setFlag(JGraphicsItem.ItemIsSelectable | JGraphicsItem.ItemShowManipulationHandlers);
                         }
                     })
                     .importData(data);
-                scene.fireRedraw();
+            scene.fireRedraw();
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
-            }
         }
     }
+}
