@@ -1,26 +1,33 @@
 package com.jgraphicsscene.node;
 
-import com.jgraphicsscene.Selection;
+import com.jgraphicsscene.PaintContext;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.geom.AffineTransform;
+import javax.swing.JLabel;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
 import java.util.ArrayList;
 import java.util.List;
 
-public class JGraphicsTextItem extends JGraphicsItem {
-    private static Font DEFAULT_FONT = new JLabel().getFont();
-    private final Rectangle boundingBox = new Rectangle();
-    private float left, top, width, height;
-    private Color color = Color.BLACK;
+@SuppressWarnings("unused")
+public class JGraphicsTextItem extends JGraphicsAbstractRectItem {
+    private static final Font DEFAULT_FONT = new JLabel().getFont();
+    private Color textColor = Color.BLACK;
     private String text;
     private Font font;
     private List<String> cachedSplittedStrings;
+    private List<Integer> cachedSplittedStringsWidth;
+    private int totalHeight;
+    private int fontAscent;
     private int cachedStringsDistance;
+    private HAlign hAlign = HAlign.LEFT;
+    private VAlign vAlign = VAlign.TOP;
 
-    public JGraphicsTextItem(float x, float y, float left, float top, float width, float height, String text) {
+    public JGraphicsTextItem(float x, float y, float width, float height, String text) {
         setPosition(x, y, false);
-        setRect(left, top, width, height);
+        setWidth(width);
+        setHeight(height);
         this.text = text;
     }
 
@@ -51,83 +58,108 @@ public class JGraphicsTextItem extends JGraphicsItem {
         return this;
     }
 
-    public float getLeft() {
-        return left;
+    public HAlign getHAlign() {
+        return hAlign;
     }
 
-    public float getTop() {
-        return top;
-    }
-
-    public float getWidth() {
-        return width;
-    }
-
-    public float getHeight() {
-        return height;
-    }
-
-    public JGraphicsTextItem setRect(float left, float top, float width, float height) {
-        this.left = left;
-        this.top = top;
-        this.width = width;
-        this.height = height;
+    public JGraphicsTextItem setHAlign(HAlign hAlign) {
+        this.hAlign = hAlign;
         return this;
     }
 
-    public Color getColor() {
-        return color;
+    public VAlign getVAlign() {
+        return vAlign;
     }
 
-    public JGraphicsTextItem setColor(Color color) {
-        this.color = color;
+    public JGraphicsTextItem setVAlign(VAlign vAlign) {
+        this.vAlign = vAlign;
         return this;
     }
 
     @Override
-    public boolean contains(float x, float y) {
-        return getBoundingBox().contains(x, y);
+    public JGraphicsAbstractRectItem setWidth(float width) {
+        cachedSplittedStrings = null;
+        return super.setWidth(width);
+    }
+
+    public Color getTextColor() {
+        return textColor;
+    }
+
+    public JGraphicsTextItem setTextColor(Color color) {
+        this.textColor = color;
+        return this;
     }
 
     @Override
-    public boolean intersect(Rectangle rectangle) {
-        return getBoundingBox().intersects(rectangle);
-    }
-
-    public Shape getBoundingBox() {
-        boundingBox.setRect((int) left, (int) top, (int) width, (int) height);
-        return mapItemToSceneImmutable(boundingBox);
-    }
-
-    @Override
-    protected void paintItem(Graphics2D g, AffineTransform oldAffineTransform, Selection selection) {
+    protected void paintItem(PaintContext p) {
+        Graphics2D g = p.getGraphics();
         g.setFont(getFont());
-        g.setColor(getColor());
+        g.setColor(getTextColor());
         if (cachedSplittedStrings == null) {
             preprocessText(g);
         }
-
-        int lineY = (int) (top + cachedStringsDistance);
-        for (String str : cachedSplittedStrings) {
-            g.drawString(str, 0, lineY);
+        int yOffset = 0;
+        if (vAlign == VAlign.CENTER) {
+            yOffset = (int) (getHeight() - totalHeight) / 2;
+            yOffset -= fontAscent;
+            if (yOffset < 0) yOffset = 0;
+        } else if (vAlign == VAlign.BOTTOM) {
+            yOffset = (int) (getHeight() - totalHeight);
+        }
+        int lineY = cachedStringsDistance + yOffset;
+        for (int i = 0; i < cachedSplittedStrings.size(); i++) {
+            String str = cachedSplittedStrings.get(i);
+            int lineWidth = cachedSplittedStringsWidth.get(i);
+            int x = 0;
+            if (hAlign == HAlign.CENTER) {
+                x = (int) (getWidth() - lineWidth) / 2;
+            } else if (hAlign == HAlign.RIGHT) {
+                x = (int) (getWidth() - lineWidth);
+            }
+            g.drawString(str, x, lineY);
             lineY += cachedStringsDistance;
         }
     }
 
     private void preprocessText(Graphics2D g) {
+        cachedSplittedStringsWidth = new ArrayList<>();
         cachedSplittedStrings = new ArrayList<>();
         FontMetrics fontMetrics = g.getFontMetrics();
         cachedStringsDistance = fontMetrics.getHeight();
-        String textToDraw = text;
-        String[] arr = textToDraw.split(" ");
+        String[] lines = text.split("\\n");
+        for (String line : lines) {
+            preprocessLine(line, fontMetrics, cachedSplittedStrings, getWidth());
+        }
+        fontAscent = fontMetrics.getHeight() - fontMetrics.getAscent();
+        //calculate width of each line and total height of the text block
+        int totalHeight = 0;
+        for (String line : cachedSplittedStrings) {
+            int width = fontMetrics.stringWidth(line);
+            cachedSplittedStringsWidth.add(width);
+            totalHeight += cachedStringsDistance;
+        }
+        this.totalHeight = totalHeight;
+    }
+
+    private static void preprocessLine(String lineToPreprocess, FontMetrics fontMetrics, List<String> outList, float requiredWidth) {
+        String[] arr = lineToPreprocess.split(" ");
         int nIndex = 0;
         while (nIndex < arr.length) {
             StringBuilder line = new StringBuilder(arr[nIndex++]);
-            while ((nIndex < arr.length) && (fontMetrics.stringWidth(line + " " + arr[nIndex]) < getWidth())) {
+            while ((nIndex < arr.length) && (fontMetrics.stringWidth(line + " " + arr[nIndex]) < requiredWidth)) {
                 line.append(" ").append(arr[nIndex]);
                 nIndex++;
             }
-            cachedSplittedStrings.add(line.toString());
+            outList.add(line.toString());
         }
+    }
+
+    public enum HAlign {
+        LEFT, CENTER, RIGHT
+    }
+
+    public enum VAlign {
+        TOP, CENTER, BOTTOM
     }
 }

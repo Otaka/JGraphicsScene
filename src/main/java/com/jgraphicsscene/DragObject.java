@@ -28,4 +28,9 @@ public class DragObject<T> {
     public T getUserObject() {
         return userObject;
     }
+
+    @Override
+    public String toString() {
+        return "Drag dx=" + dx + " dy=" + dy;
+    }
 }

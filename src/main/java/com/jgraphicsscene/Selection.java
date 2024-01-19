@@ -24,8 +24,10 @@ public class Selection {
         return rubberBandRectangle;
     }
 
-    public Set<JGraphicsItem> getSelectedItems() {
-        return selectedItems;
+    public void cancelRubberBandRectangle() {
+        setRubberBandDragging(false);
+        getRubberBandRectangle().setSize(0, 0);
+        updateNormalizedRubberBandRectangle();
     }
 
     public JGraphicsItem getSelectedItem() {
@@ -33,6 +35,18 @@ public class Selection {
             return item;
         }
         return null;
+    }
+
+    public Set<JGraphicsItem> getSelectedItems() {
+        return selectedItems;
+    }
+
+    public void addSelectedItem(JGraphicsItem item) {
+        selectedItems.add(item);
+    }
+
+    public void clearSelectedItems() {
+        selectedItems.clear();
     }
 
     public Rectangle getNormalizedRubberBandRectangle() {

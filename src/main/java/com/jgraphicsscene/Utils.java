@@ -33,4 +33,8 @@ public class Utils {
             rect.y = rect.y - rect.height;
         }
     }
+
+    public static float lerp(float valueStart, float valueEnd, float t) {
+        return valueStart + t * (valueEnd - valueStart);
+    }
 }

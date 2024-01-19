@@ -2,36 +2,71 @@ package com.jgraphicsscene.node;
 
 import com.jgraphicsscene.JGraphicsContainer;
 import com.jgraphicsscene.JGraphicsScene;
+import com.jgraphicsscene.JGraphicsView;
+import com.jgraphicsscene.PaintContext;
 import com.jgraphicsscene.Selection;
-import com.jgraphicsscene.Utils;
+import com.jgraphicsscene.effects.JGraphicsAbstractEffect;
 import com.jgraphicsscene.events.ItemChangedEvent;
 import com.jgraphicsscene.events.ItemChangedType;
+import com.jgraphicsscene.utils.Transform;
 
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
+import java.awt.Shape;
+import java.awt.Stroke;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public abstract class JGraphicsItem implements JGraphicsContainer {
+@SuppressWarnings({"unused", "UnusedReturnValue"})
+public abstract class JGraphicsItem extends JGraphicsContainer {
     public static final int ItemIsMovable = 1 << 0;
     public static final int ItemIsSelectable = 1 << 1;
     public static final int ItemIsFocusable = 1 << 2;
-    public static final int ItemIgnoresTransformations = 1 << 3;
-    public static final int ItemSendsMoved = 1 << 4;
-    private static Stroke SELECTION_STROKE = new BasicStroke(2, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_ROUND, 0, new float[]{5}, 0);
-    private final AffineTransform transform = new AffineTransform();
+    public static final int ItemIgnoresParentScale = 1 << 3;
+    public static final int ItemShowManipulationHandlers = 1 << 4;
+    public static final int ItemAppliesOwnEffectToChildren = 1 << 5;
+    private static final Stroke SELECTION_STROKE = new BasicStroke(2, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_ROUND, 0, new float[]{5}, 0);
+    protected final Transform transform = new Transform();
+    protected final Transform cachedSceneViewTransform = new Transform();
     private final List<ItemChangedEvent> events = new ArrayList<>();
-    protected JGraphicsScene scene;
+    protected Shape viewBoundingShape;
+    protected int viewTransformVersion = -1;
     protected float x;
     protected float y;
     protected float rotation;
-    private List<JGraphicsItem> items;
-    private JGraphicsItem parent;
+    protected JGraphicsScene scene;
+    boolean visible = true;
     private float scale = 1;
-    private boolean dirtyTransform = true;
+    private List<JGraphicsItem> items;
+    private JGraphicsContainer parent;
     private int flag;
+    private float zOrder = 0;
+    private float zOrderOffset = 0;
+    private List<JGraphicsAbstractEffect> effects;
+
+    public JGraphicsItem addEffect(JGraphicsAbstractEffect effect) {
+        if (effects == null) {
+            effects = new ArrayList<>();
+        }
+        effects.add(effect);
+        return this;
+    }
+
+    public List<JGraphicsAbstractEffect> getEffects() {
+        return effects == null ? Collections.emptyList() : effects;
+    }
+
+    public JGraphicsItem removeEffect(JGraphicsAbstractEffect effect) {
+        getEffects().remove(effect);
+        if (effects.isEmpty()) effects = null;
+        return this;
+    }
+
 
     public JGraphicsItem addEvent(ItemChangedEvent event) {
         events.add(event);
@@ -43,18 +78,62 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
         return this;
     }
 
-    public void fireEvent(ItemChangedType type) {
+    public JGraphicsItem deleteEvents() {
+        events.clear();
+        return this;
+    }
+
+    public void fireEvent(ItemChangedType type, Object arg) {
         for (int i = 0; i < events.size(); i++) {
-            events.get(i).changed(type, this);
+            events.get(i).changed(type, this, arg);
         }
+    }
+
+    public float getTotalZOrder() {
+        return zOrder + zOrderOffset;
+    }
+
+    public float getZOrder() {
+        return zOrder;
+    }
+
+    public JGraphicsItem setZOrder(float zOrder) {
+        this.zOrder = zOrder;
+        if (parent != null) {
+            parent.setRequiresSorting(true);
+        }
+        return this;
+    }
+
+    public float getZOrderOffset() {
+        return zOrderOffset;
+    }
+
+    public JGraphicsItem setZOrderOffset(float zOrderOffset) {
+        this.zOrderOffset = zOrderOffset;
+        if (parent != null) {
+            parent.setRequiresSorting(true);
+        }
+        return this;
+    }
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
     }
 
     public float getRotation() {
         return rotation;
     }
 
-    public JGraphicsItem setRotation(float rotation) {
-        this.rotation = rotation;
+    public JGraphicsItem setRotation(float angleRad) {
+        if (Float.isNaN(angleRad)) {
+            throw new IllegalArgumentException("angle cannot be NaN");
+        }
+        this.rotation = angleRad;
         return this;
     }
 
@@ -62,25 +141,66 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
         return x;
     }
 
+    public float getXCenter() {
+        return x + getWidth() / 2;
+    }
+
     public float getY() {
         return y;
     }
 
+    public float getYCenter() {
+        return y + getHeight() / 2;
+    }
+
     public Point2D getGlobalPosition() {
         Point2D p = new Point2D.Float(x, y);
-        getParentTransform().transform(p, p);
-        return p;
+        return getParentTransform().transformMut(p);
+    }
+
+    public Point2D getGlobalPositionCenter() {
+        float zoom = getScene().getView().getZoom();
+        Point2D p = new Point2D.Float(x + (getWidth() / 2), y + (getHeight() / 2));
+        return getParentTransform().transformMut(p);
+    }
+
+    public Point2D getPositionInView(JGraphicsView view) {
+        Point2D p = getGlobalPosition();
+        return view.mapSceneToView(p);
+    }
+
+    public JGraphicsItem setPositionByCenter(float x, float y, boolean global) {
+        if (hasFlag(ItemIgnoresParentScale)) {
+            float zoom = getScene().getView().getZoom();
+            x -= (getWidth() / 2);
+            y -= (getHeight() / 2);
+            return setPosition(x, y, global);
+        } else {
+            x -= (getWidth() / 2);
+            y -= (getHeight() / 2);
+            return setPosition(x, y, global);
+        }
+    }
+
+    public JGraphicsItem setPositionByCenter(Point2D pos, boolean global) {
+        return setPositionByCenter((float) pos.getX(), (float) pos.getY(), global);
     }
 
     public JGraphicsItem setPosition(float x, float y, boolean global) {
+        if (Float.isNaN(x)) {
+            throw new IllegalArgumentException("x is NaN");
+        }
+        if (Float.isNaN(y)) {
+            throw new IllegalArgumentException("y is NaN");
+        }
         if (!global) {
             this.x = x;
             this.y = y;
         } else {
             Point2D point = JGraphicsScene.getTempPoint(x, y);
-            Utils.inverseTransformPoint(point, getParentTransform());
-            this.x = (float) point.getX();
-            this.y = (float) point.getY();
+            Point2D newPoint = getParentTransform().inverseTransformPoint(point, new Point2D.Float());
+            this.x = (float) newPoint.getX();
+            this.y = (float) newPoint.getY();
             JGraphicsScene.disposeTempPoint(point);
         }
         return this;
@@ -95,6 +215,9 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
     }
 
     public JGraphicsScene getScene() {
+        if (scene == null) {
+            scene = getParent().getScene();
+        }
         return scene;
     }
 
@@ -108,7 +231,6 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
     }
 
     public JGraphicsItem setFlag(int flag) {
-
         this.flag = flag;
         return this;
     }
@@ -126,14 +248,20 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
         if (items == null) {
             items = new ArrayList<>();
         }
+        child.setScene(scene);
         items.add(child);
         child.setParent(this);
+        setRequiresSorting(true);
         return this;
     }
 
-    public void setParent(JGraphicsItem parent) {
-        if (this.parent != null && this.parent.items != null) {
-            this.parent.items.remove(this);
+    public JGraphicsContainer getParent() {
+        return parent;
+    }
+
+    public void setParent(JGraphicsContainer parent) {
+        if (this.parent != null && this.parent.getItems() != null) {
+            this.parent.getItems().remove(this);
         }
         this.parent = parent;
     }
@@ -147,70 +275,126 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
         return this;
     }
 
-    public abstract boolean contains(float x, float y);
-
-    public abstract boolean intersect(Rectangle rectangle);
-
-    public final void paint(Graphics2D g, Selection selection) {
-        AffineTransform oldAffineTransform = g.getTransform();
-        AffineTransform tempTransform = JGraphicsScene.getTempTransform();
-        tempTransform.setToIdentity();
-        tempTransform.concatenate(oldAffineTransform);
-        tempTransform.concatenate(getTransform());
-        g.setTransform(tempTransform);
-        paintItem(g, oldAffineTransform, selection);
-        if (selection.getSelectedItems().contains(this)) {
-            g.setTransform(new AffineTransform());
-            Stroke oldStroke = g.getStroke();
-            setSelectionStroke(g);
-            g.setXORMode(Color.WHITE);
-            g.setColor(Color.black);
-            g.draw(oldAffineTransform.createTransformedShape(getBoundingBox()));
-            g.setStroke(oldStroke);
-            g.setPaintMode();
-        }
-        g.setTransform(oldAffineTransform);
-        JGraphicsScene.disposeTempTransform(tempTransform);
-
-        if (items != null) {
-            for (int i = 0; i < items.size(); i++) {
-                items.get(i).paint(g, selection);
-            }
-        }
+    public boolean contains(float x, float y) {
+        return getViewBoundingShape().contains(x, y);
     }
 
-    public AffineTransform getParentTransform() {
-        if (parent != null) {
-            return parent.getTransform();
-        } else {
-            AffineTransform transform = new AffineTransform();
-            transform.setToIdentity();
-            return transform;
-        }
+
+    public boolean intersect(Rectangle rectangle) {
+        return getViewBoundingShape().intersects(rectangle);
     }
 
-    public AffineTransform getTransform() {
-        if (dirtyTransform) {
+    public Transform getTransform() {
+        if (transform.isDirty()) {
             if (parent != null) {
-                transform.setTransform(parent.getTransform());
-            } else {
-                transform.setToIdentity();
+                transform.setFromTransform(parent.getTransform());
             }
             transform.translate(x, y);
             transform.rotate(rotation);
             transform.scale(scale, scale);
-            dirtyTransform = false;
+            transform.clearDirty();
+            afterTransformRecalculation();
         }
         return transform;
     }
 
-    public void dirtyTransform() {
-        dirtyTransform = true;
+    public Transform getSceneViewTransform() {
+        Transform itemTransform = getTransform();
+        Transform viewTransform = getScene().getView().getViewTransform();
+        int viewTransformVersion = viewTransform.getVersion();
+        if (!cachedSceneViewTransform.isDirty() && cachedSceneViewTransform.getVersion() == viewTransformVersion) {
+            return cachedSceneViewTransform;
+        }
+
+        if (!hasFlag(ItemIgnoresParentScale)) {
+            cachedSceneViewTransform.setFromTransform(viewTransform);
+            cachedSceneViewTransform.concatenate(itemTransform);
+            cachedSceneViewTransform.setVersion(viewTransformVersion);
+        } else {
+            float initialViewZoom = getScene().getView().getInitialZoom();
+            Point2D positionInView = getPositionInView(getScene().getView());
+            cachedSceneViewTransform.setToIdentity();
+            cachedSceneViewTransform.setToScale(initialViewZoom, initialViewZoom);
+            cachedSceneViewTransform.translate(positionInView.getX() / initialViewZoom, positionInView.getY() / initialViewZoom);
+            cachedSceneViewTransform.rotate(rotation);
+            cachedSceneViewTransform.scale(scale, scale);
+        }
+        cachedSceneViewTransform.clearDirty();
+        return cachedSceneViewTransform;
+    }
+
+    public final void paint(PaintContext p, Selection selection) {
+        Graphics2D g = p.getGraphics();
+        AffineTransform oldAffineTransform = g.getTransform();
+        Transform sceneViewTransform = getSceneViewTransform();
+        g.setTransform(sceneViewTransform.getAffineTransform());
+
+        boolean effectsApplied = false;
+        if (effects != null) {
+            effectsApplied = true;
+            for (int i = 0; i < effects.size(); i++) effects.get(i).beforeRender(p);
+        }
+
+        if (p.isRenderingEnabled() && isVisible()) {
+            paintItem(p);
+        }
+
+        if (effectsApplied && !hasFlag(ItemAppliesOwnEffectToChildren)) {
+            effectsApplied = false;
+            if (effects != null) {
+                for (int i = 0; i < effects.size(); i++) effects.get(i).afterRender(p);
+            }
+        }
+        g.setTransform(oldAffineTransform);
+        if (items != null) {
+            for (int i = 0; i < items.size(); i++) {
+                JGraphicsItem item = items.get(i);
+                item.paint(p, selection);
+            }
+        }
+
+        if (effectsApplied) {
+            for (int i = 0; i < effects.size(); i++) effects.get(i).afterRender(p);
+        }
+
+        if (p.isRenderingEnabled() && isVisible() && selection.getSelectedItems().contains(this)) {
+            g.setTransform(sceneViewTransform.getAffineTransform());
+
+            Shape viewBoundingShape = getViewBoundingShape();
+            g.setTransform(p.getOriginalTransform());
+            Stroke oldStroke = g.getStroke();
+            setSelectionStroke(g);
+            p.setXORMode(Color.WHITE);
+            g.setColor(Color.black);
+            g.draw(viewBoundingShape);
+            g.setStroke(oldStroke);
+            p.restoreXORMode();
+
+            g.setTransform(oldAffineTransform);
+        }
+    }
+
+    public Transform getParentTransform() {
+        if (parent != null) {
+            return parent.getTransform();
+        }
+        throw new IllegalStateException("Cannot get parent transform because the item is not in a container");
+    }
+
+    protected void afterTransformRecalculation() {
+        //filled by subclasses
+    }
+
+    public JGraphicsItem dirtyTransform() {
+        invalidateViewBoundingShape();
+        cachedSceneViewTransform.setDirty();
+        transform.setDirty();
         if (items != null) {
             for (int i = 0; i < items.size(); i++) {
                 items.get(i).dirtyTransform();
             }
         }
+        return this;
     }
 
     protected void setSelectionStroke(Graphics2D g) {
@@ -218,18 +402,54 @@ public abstract class JGraphicsItem implements JGraphicsContainer {
     }
 
     public Shape mapItemToSceneImmutable(Shape shape) {
-        return getTransform().createTransformedShape(shape);
+        return getTransform().getAffineTransform().createTransformedShape(shape);
     }
 
-    public Point2D mapItemToScene(Point2D point) {
-        return getTransform().transform(point, point);
+    public Point2D mapItemToSceneMut(Point2D point) {
+        return getTransform().transformMut(point);
     }
 
-    public Point2D mapSceneToItem(Point2D point) {
-        return Utils.inverseTransformPoint(point, getTransform());
+    public Point2D mapItemToSceneImmutable(Point2D point) {
+        return getTransform().transform(point, new Point2D.Float());
     }
 
-    public abstract Shape getBoundingBox();
+    public Point2D mapSceneToItemMut(Point2D point) {
+        return getTransform().inverseTransformPointMut(point);
+    }
 
-    protected abstract void paintItem(Graphics2D g, AffineTransform oldAffineTransform, Selection selection);
+    public Point2D mapSceneToItemImmutable(Point2D point) {
+        return getTransform().inverseTransformPoint(point, new Point2D.Float());
+    }
+
+    public Shape getViewBoundingShape() {
+        int actualViewTransformVersion = getScene().getView().getViewTransform().getVersion();
+        if (viewBoundingShape != null && actualViewTransformVersion == viewTransformVersion) {
+            return viewBoundingShape;
+        }
+        viewTransformVersion = actualViewTransformVersion;
+        viewBoundingShape = getSceneViewTransform().transformImmutable(createBoundingShape());
+        return viewBoundingShape;
+    }
+
+    public abstract Shape createBoundingShape();
+
+    public void invalidateViewBoundingShape() {
+        viewBoundingShape = null;
+    }
+
+    protected abstract void paintItem(PaintContext p);
+
+    protected abstract float getWidth();
+
+    protected abstract float getHeight();
+
+    public void onSelect() {
+    }
+
+    public void onDeselect() {
+    }
+
+    public List<JGraphicsItem> createManipulators() {
+        return Collections.emptyList();
+    }
 }

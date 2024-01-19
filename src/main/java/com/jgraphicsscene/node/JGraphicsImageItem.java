@@ -1,48 +1,44 @@
 package com.jgraphicsscene.node;
 
-import com.jgraphicsscene.Selection;
+import com.jgraphicsscene.PaintContext;
 
-import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.Shape;
-import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 
-public class JGraphicsImageItem extends JGraphicsItem {
-    private final BufferedImage image;
-    private final Rectangle boundingBox = new Rectangle();
-    private float left, top;
+public class JGraphicsImageItem extends JGraphicsAbstractRectItem {
+    private BufferedImage image;
 
     public JGraphicsImageItem(float x, float y, BufferedImage image) {
         setPosition(x, y, false);
+        setImage(image);
+    }
+
+    public BufferedImage getImage() {
+        return image;
+    }
+
+    public JGraphicsImageItem setImage(BufferedImage image) {
         this.image = image;
-    }
-
-    public float getWidth() {
-        return image.getWidth();
-    }
-
-    public float getHeight() {
-        return image.getHeight();
-    }
-
-    @Override
-    public boolean contains(float x, float y) {
-        return getBoundingBox().contains(x, y);
+        if (image != null) {
+            width = image.getWidth();
+            height = image.getHeight();
+        } else {
+            width = 0;
+            height = 0;
+        }
+        return this;
     }
 
     @Override
-    public boolean intersect(Rectangle rectangle) {
-        return getBoundingBox().intersects(rectangle);
-    }
-
-    public Shape getBoundingBox() {
-        boundingBox.setRect((int) left, (int) top, (int) getWidth(), (int) getHeight());
-        return mapItemToSceneImmutable(boundingBox);
+    public Shape getViewBoundingShape() {
+        if (getImage() == null) return new Rectangle(0, 0, 0, 0);
+        return super.getViewBoundingShape();
     }
 
     @Override
-    protected void paintItem(Graphics2D g, AffineTransform oldAffineTransform, Selection selection) {
-        g.drawImage(image, (int) left, (int) top, null);
+    protected void paintItem(PaintContext p) {
+        if (getImage() == null) return;
+        p.getGraphics().drawImage(getImage(), (int) xOffset, (int) yOffset, (int) getWidth(), (int) getHeight(), null);
     }
 }
